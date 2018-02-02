@@ -29,8 +29,4 @@
             android:label="@string/category_family"
             ></activity>
     </application>
-
-    
-    
-    
 </manifest>
