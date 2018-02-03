@@ -1,5 +1,7 @@
 package com.medhatmhtt.miwok;
 
+import android.content.Context;
+import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.provider.MediaStore;
 import android.support.v7.app.AppCompatActivity;
@@ -13,6 +15,23 @@ import java.util.Arrays;
 
 public class ColorsActivity extends AppCompatActivity {
     private MediaPlayer mediaPlayer;
+    private AudioManager audioManager;
+
+    private AudioManager.OnAudioFocusChangeListener onAudioFocusChangeListener=new AudioManager.OnAudioFocusChangeListener() {
+        @Override
+        public void onAudioFocusChange(int focusChange) {
+            if(focusChange==AudioManager.AUDIOFOCUS_LOSS_TRANSIENT||focusChange==AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK){
+                mediaPlayer.pause();
+                mediaPlayer.seekTo(0);
+            }
+            else if(focusChange==AudioManager.AUDIOFOCUS_GAIN){
+                mediaPlayer.start();
+            }
+            else if(focusChange==AudioManager.AUDIOFOCUS_LOSS){
+                releaseMediaPlayer();
+            }
+        }
+    };
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -27,6 +46,7 @@ public class ColorsActivity extends AppCompatActivity {
                 new Word("ṭopiisә","Dusty Yellow",R.drawable.color_dusty_yellow,R.raw.color_dusty_yellow),
                 new Word("chiwiiṭә","Mustard Yellow",R.drawable.color_mustard_yellow,R.raw.color_mustard_yellow)
         ));
+        audioManager = (AudioManager)getSystemService(Context.AUDIO_SERVICE);
         ListView listView=(ListView) findViewById(R.id.list);
         WordAdapter wordAdapter=new WordAdapter(this,words,R.color.category_colors);
         listView.setAdapter(wordAdapter);
@@ -34,25 +54,37 @@ public class ColorsActivity extends AppCompatActivity {
                 new AdapterView.OnItemClickListener() {
                     @Override
                     public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
-                        Word word =words.get(i);
+                        Word word = words.get(i);
                         releaseMediaPlayer();
-                        mediaPlayer= MediaPlayer.create(ColorsActivity.this,word.getRecordResource());
-                        mediaPlayer.start();
-                        mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
-                            @Override
-                            public void onCompletion(MediaPlayer mediaPlayer) {
-                                releaseMediaPlayer();
-                            }
-                        });
+                        int result = audioManager.requestAudioFocus(onAudioFocusChangeListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
+                        if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+                            mediaPlayer = MediaPlayer.create(ColorsActivity.this, word.getRecordResource());
+                            mediaPlayer.start();
+                            mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+                                                                    @Override
+                                                                    public void onCompletion(MediaPlayer mediaPlayer) {
+                                                                        releaseMediaPlayer();
+                                                                    }
+                                                                }
+
+                            );
+                        }
                     }
-                }
-        );
+                });
     }
+
 
     private void releaseMediaPlayer(){
         if(mediaPlayer!=null){
             mediaPlayer.release();
             mediaPlayer=null;
+            audioManager.abandonAudioFocus(onAudioFocusChangeListener);
         }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        releaseMediaPlayer();
     }
 }
